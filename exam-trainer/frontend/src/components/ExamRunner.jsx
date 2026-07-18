@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Clock, CheckCircle, XCircle, ArrowLeft, ArrowRight, Home, Repeat, Eye, EyeOff, Edit2, LogOut, MessageSquare } from 'lucide-react';
 import QuestionEditor from './QuestionEditor';
 import { API_URL } from '../config';
+import { formatAnswers, isAnswerCorrect, normalizeAnswers } from '../utils/answerScoring';
 
 const ExamRunner = ({ filename, config, initialQuestions, onRetry, onExit }) => {
     const [allQuestions, setAllQuestions] = useState([]);
@@ -107,8 +108,7 @@ const ExamRunner = ({ filename, config, initialQuestions, onRetry, onExit }) => 
     const getQuestionKey = (q) => `${q.topic}-${q.id}`;
 
     const isMultipleChoice = (q) => {
-        // A question is multiple choice if the answer has more than one letter
-        return q.answer && q.answer.length > 1;
+        return normalizeAnswers(q.answer).length > 1;
     };
 
     const handleOptionSelect = (q, optionText) => {
@@ -145,9 +145,7 @@ const ExamRunner = ({ filename, config, initialQuestions, onRetry, onExit }) => 
         let correctCount = 0;
         sessionQuestions.forEach(q => {
             const userAns = userAnswers[getQuestionKey(q)] || [];
-            const correctAns = q.answer.split('').sort().join('');
-            const userAnsStr = userAns.sort().join('');
-            if (userAnsStr === correctAns) {
+            if (isAnswerCorrect(userAns, q.answer)) {
                 correctCount++;
             }
         });
@@ -202,9 +200,7 @@ const ExamRunner = ({ filename, config, initialQuestions, onRetry, onExit }) => 
 
         const wrongQuestions = sessionQuestions.filter(q => {
             const userAns = userAnswers[getQuestionKey(q)] || [];
-            const correctAns = q.answer.split('').sort().join('');
-            const userAnsStr = userAns.sort().join('');
-            return userAnsStr !== correctAns;
+            return !isAnswerCorrect(userAns, q.answer);
         });
 
         return (
@@ -241,8 +237,8 @@ const ExamRunner = ({ filename, config, initialQuestions, onRetry, onExit }) => 
                 <div style={{ textAlign: 'left', marginTop: '3rem' }}>
                     <h3 style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem', marginBottom: '1.5rem' }}>Review</h3>
                     {sessionQuestions.map((q, idx) => {
-                        const userAns = userAnswers[getQuestionKey(q)];
-                        const isCorrect = userAns === q.answer;
+                        const userAns = userAnswers[getQuestionKey(q)] || [];
+                        const isCorrect = isAnswerCorrect(userAns, q.answer);
                         return (
                             <div key={idx} style={{
                                 padding: '1.5rem',
@@ -262,7 +258,7 @@ const ExamRunner = ({ filename, config, initialQuestions, onRetry, onExit }) => 
                                     </span>
                                     {!isCorrect && <span style={{ color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                         <CheckCircle size={16} />
-                                        Correct: {q.answer.split('').join(', ')}
+                                        Correct: {formatAnswers(q.answer)}
                                     </span>}
                                 </div>
                             </div>
@@ -277,6 +273,7 @@ const ExamRunner = ({ filename, config, initialQuestions, onRetry, onExit }) => 
     const currentKey = getQuestionKey(currentQ);
     const selectedAnswers = userAnswers[currentKey] || [];
     const isMultiple = isMultipleChoice(currentQ);
+    const correctAnswers = normalizeAnswers(currentQ.answer);
 
     return (
         <div className="exam-runner">
@@ -319,7 +316,7 @@ const ExamRunner = ({ filename, config, initialQuestions, onRetry, onExit }) => 
                     {currentQ.options.map((opt, idx) => {
                         const letter = opt.match(/^([A-Z])\./)?.[1];
                         const isSelected = selectedAnswers.includes(letter);
-                        const isCorrectAnswer = currentQ.answer.includes(letter);
+                        const isCorrectAnswer = correctAnswers.includes(letter);
 
                         let borderColor = 'transparent';
                         let bgColor = 'rgba(255,255,255,0.05)';
@@ -377,7 +374,7 @@ const ExamRunner = ({ filename, config, initialQuestions, onRetry, onExit }) => 
                     {showAnswer && (
                         <div style={{ fontSize: '1.2em', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.5rem', animation: 'fadeIn 0.3s ease' }}>
                             <CheckCircle size={20} color="var(--success)" />
-                            Correct: <span style={{ color: 'var(--success)' }}>{currentQ.answer}</span>
+                            Correct: <span style={{ color: 'var(--success)' }}>{formatAnswers(currentQ.answer)}</span>
                         </div>
                     )}
                 </div>
